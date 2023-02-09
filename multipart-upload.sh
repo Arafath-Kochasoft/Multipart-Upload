@@ -3,7 +3,7 @@
 filename="./BlackBox"
 part_size=6291456 # 6 MB
 # part_size=6291456*7/6 # 6 MB
-black_image="Black-Image"
+black_image="BlackBox"
 bucket_name="blackbox-test-00811"
 
 # get size of a give file name
@@ -41,12 +41,12 @@ function create_part_file() {
   # output file
   parts_json="parts.json"
   # get the Etag for the part from the singlepart.json
-  ETag=$(jq -r -r '.ETag' singlepart.json | sed 's/^"\(.*\)"$/\1/')
+  ETag=$(jq -r '.ETag' singlepart.json | sed 's/^"\(.*\)"$/\1/')
   # temp file
   temp_file="temp.json"
 
   # add the part number and Etag to the file name parts.json
-  jq --arg part $part_num --arg Etag "$ETag" '.Parts |= . + [{"PartNumber": $part, "ETag": $Etag}]' "$parts_json" > "$temp_file"
+  jq --arg part $part_num --arg Etag "$ETag" '.Parts |= . + [{"PartNumber": $part|tonumber, "ETag": $Etag}]' "$parts_json" > "$temp_file"
   mv "$temp_file" "$parts_json"
  
 }
@@ -60,14 +60,15 @@ function upload_a_part() {
 
   # this python file take part size and part number and the part binary will store in out.txt
   python main.py $seek_part $read_size $part_num $filename
-  ibmcloud cos part-upload --bucket $bucket_name --key $black_image --upload-id $upload_id --part-number $part_num --body out.txt
+  ibmcloud cos part-upload --bucket $bucket_name --key $black_image --upload-id $upload_id --part-number $part_num --body out.txt --output json > singlepart.json
 }
 
 # complete the multipart upload with the response of json format
 function complete_multipart_upload() {
   upload_id=$1
-
-  ibmcloud cos multipart-upload-complete --bucket $bucket_name --key $black_image --upload-id $upload_id --multipart-upload file://$(pwd)/parts.json
+  part_file=$(jq -c '.' parts.json)
+  # echo file://$(pwd)/parts.json
+  ibmcloud cos multipart-upload-complete --bucket $bucket_name --key $black_image --upload-id $upload_id --multipart-upload $part_file
 }
 
 # number of parts and the remaing parts
@@ -80,6 +81,7 @@ function part_count_data() {
   # return parts count that can be created using given part size
   # the size of the remaining part
 }
+
 
 function main() {
 
@@ -100,27 +102,31 @@ function main() {
   echo "Uploading parts..."
   for ((part_num=1; part_num<part_count; part_num++)); do
     upload_a_part $part_size $part_size $part_num $upload_id
-    # create_part_file $part_num
+    create_part_file $part_num
   done
 
   # upload remaining part after the given part size parts are completed
   if [ $part_remaining -ne 0 ]; then
     echo "Remaining part is uploading..."
     upload_a_part $part_size $part_remaining $part_count $upload_id
-    # create_part_file $part_count
+    create_part_file $part_count
     echo "Remaining part was uploaded."
   fi
   echo "All parts were uploaded."
 
-  # complete_multipart_upload $upload_id # complete the multipart upload
+  complete_multipart_upload $upload_id # complete the multipart upload
 }
 
+upload_id=$(jq -r '.UploadId' multipart.json) # get the multipart session ID
 arg=$1
 if [ "$arg" == "main" ]; then
   main
-else
-  upload_id=$(jq -r '.UploadId' multipart.json) # get the multipart session ID
+elif [ "$arg" == "complete" ]; then
+  complete_multipart_upload $upload_id # complete the multipart upload
+elif [ "$arg" == "create" ]; then
+  create_multipart_upload # create a multipart upload session
+elif [ "$arg" == "abort" ]; then
   abort_multipart_upload $upload_id # abort the multipart upload
+else
+  echo "Arg required"
 fi
-
-
