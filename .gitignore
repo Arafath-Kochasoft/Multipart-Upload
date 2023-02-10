@@ -1,4 +1,8 @@
-./BlackBox
-./BlackboxImage
-./Im.rar
-./test.txt
+BlackBox
+BlackboxImage
+Im.rar
+test.txt
+multipart.json
+progress-multpart.json
+singlepart.json
+test.sh

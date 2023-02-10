@@ -1,12 +1,3 @@
 {
-  "Parts": [
-    {
-      "PartNumber": 1,
-      "ETag": "da6a0d097e307ac52ed9b4ad551801fc"
-    },
-    {
-      "PartNumber": 2,
-      "ETag": "da6a0d097e307ac52ed9b4ad551801fc"
-    }
-  ]
+  "Parts": []
 }
